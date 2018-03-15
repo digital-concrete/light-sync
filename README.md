@@ -50,8 +50,6 @@ Result will look like:
 
 4) Calculate which of the colors calculated in step 3 should be sent to Philips Hue lights.
 If the most prevalent color is either too dark or too bright it means that we have an image with bright or dark background. In this case we look for the next color until we find a color that suits the conditions.
-In our example, the relevant color will be:
-![color](example/result_color.jpg)
 
 5) Check whether the calculated color is different than the one already in use. Tweak ```COLOR_SKIP_SENSITIVITY``` variable to change the sensitivity.
 
