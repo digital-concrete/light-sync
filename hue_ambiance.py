@@ -90,7 +90,7 @@ class FrameColor(object):
         self.index = index
         self.color_count = color_count
         self.is_dark = False
-        self.id_bright = False
+        self.is_bright = False
         self.calculate_light_dark_channels()
 
     def calculate_light_dark_channels(self):
