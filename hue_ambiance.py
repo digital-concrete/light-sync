@@ -43,6 +43,18 @@ BRIDGE_IP = '192.168.1.22'
 # Your Philips HUE lights that will be updated by this script
 MY_LIGHT_NAMES = ['Light1', 'Light2']
 
+# Dim lights instead of turn off
+DIM_LIGHTS_INSTEAD_OF_TURN_OFF = False
+
+# Starting brightness
+STARTING_BRIGHTNESS = 100
+
+# Dim brightness
+DIM_BRIGHTNESS = 20
+
+# Transition time
+TRANSITION_TIME = 1
+
 # Max number of Hue update requests per second. Used to prevent Hue Bridge bottleneck
 HUE_MAX_REQUESTS_PER_SECOND = 3
 
@@ -72,12 +84,6 @@ NUMBER_OF_K_MEANS_CLUSTERS = 6
 # by the K Means algorithm.
 # Image will be scaled to a much smaller size resulting in real time updating of the lights
 INPUT_IMAGE_REDUCED_SIZE = 200
-
-# Transition time
-TRANSITION_TIME = 1
-
-# Starting brightness
-STARTING_BRIGHTNESS = 80
 
 # Frame Color Definition
 
@@ -213,6 +219,7 @@ def main():
     "main routine"
     # Variables
     go_dark = False
+    current_brightness = STARTING_BRIGHTNESS
     lights_are_on = True
     prev_color = None
     prev_frame = None
@@ -274,22 +281,22 @@ def main():
                 # If False go through all routines
                 go_dark = False
 
-                # Calculate relevant color for this frame
-                result_color = calculate_hue_color(masked_frame)
+            # Calculate relevant color for this frame
+            result_color = calculate_hue_color(masked_frame)
 
-                # Compare Current Calculated Color with previous Color
-                # Skip frame if result color is almost identical
-                if prev_color is not None and not go_dark and lights_are_on:
-                    skip_frame = True
+            # Compare Current Calculated Color with previous Color
+            # Skip frame if result color is almost identical
+            if prev_color is not None and not go_dark and lights_are_on:
+                skip_frame = True
 
-                    for j in range(0, 3):
-                        ch_diff = math.fabs(
-                            int(prev_color.color[j]) - int(result_color.color[j]))
-                        if ch_diff > COLOR_SKIP_SENSITIVITY:
-                            skip_frame = False
-                            break
-                    if skip_frame:
-                        continue
+                for j in range(0, 3):
+                    ch_diff = math.fabs(
+                        int(prev_color.color[j]) - int(result_color.color[j]))
+                    if ch_diff > COLOR_SKIP_SENSITIVITY:
+                        skip_frame = False
+                        break
+                if skip_frame:
+                    continue
 
             # Send color to Hue if update flag is clear
             if CAN_UPDATE_HUE:
@@ -326,9 +333,17 @@ def main():
 
                     # COMMENT OR REMOVE THIS BLOCK IF YOU DON'T WANT TO SWITCH ON/OFF YOUR LIGHTS
                     if switch_lights:
-                        light_names[hue_light].on = lights_are_on
+                        if not DIM_LIGHTS_INSTEAD_OF_TURN_OFF:
+                            light_names[hue_light].on = lights_are_on
+                        else:
+                            if lights_are_on:
+                                light_names[hue_light].brightness = current_brightness
+                            else:
+                                current_brightness = light_names[hue_light].brightness
+                                light_names[hue_light].brightness = DIM_BRIGHTNESS
 
-                    if lights_are_on:
+
+                    if lights_are_on or DIM_LIGHTS_INSTEAD_OF_TURN_OFF:
                         light_names[hue_light].xy = result_color.get_hue_color()
 
                 print 'fps: {0}'.format(1 / (time.time()-last_time))
