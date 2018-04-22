@@ -42,7 +42,9 @@ Let's suppose we have following frame:
 ![masked_image](example/masked_image.jpg)
 
 6) Compare the count of non zero value pixels in the image with ```MIN_NON_ZERO_COUNT```.
-If the count is too little, then turn off the lights.
+If the count is too little, then turn off/dim the lights.
+If ```VARIABLE_BRIGHTNESS_MODE``` is set to true then brightness is calculated based on the non zero pixel count.
+If ```DIM_LIGHTS_INSTEAD_OF_TURN_OFF``` is set to true then, whenever the count is below the lower threshold ```MIN_NON_ZERO_COUNT```, the lights are being dimmed instead of turned off.
 
 3) Apply **OpenCV K Means Clustering** in order to find main image colors.
 Result will look like:
@@ -56,13 +58,8 @@ If the most prevalent color is either too dark or too bright it means that we ha
 
 6) Finally, we have the ```CAN_UPDATE_HUE``` variable that allows us to update the lights. This variable is used to prevent bridge request bottlenecks and is cleared by a timeout. Timeout duration can be adjusted by changing ```HUE_MAX_REQUESTS_PER_SECOND``` variable.
 
-7) If the above flag is clear we can finally update the lights: change color, switch them on/off :)
+7) If the above flag is clear we can finally update the lights: change color, brightness, dim or switch them on/off :)
 
-**If you do not want the lights to turn on and off you can comment or remove following lines (328 and 329):**
-```
-if SWITCH_LIGHTS:
-    LIGHT_NAMES[hue_light].on = LIGHTS_ARE_ON
-```   
 
 ## Based on:
 

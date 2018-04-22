@@ -44,13 +44,16 @@ BRIDGE_IP = '192.168.1.22'
 MY_LIGHT_NAMES = ['Light1', 'Light2']
 
 # Dim lights instead of turn off
-DIM_LIGHTS_INSTEAD_OF_TURN_OFF = False
+DIM_LIGHTS_INSTEAD_OF_TURN_OFF = True
+
+# Set the brightness depending on the image overall brightness
+VARIABLE_BRIGHTNESS_MODE = True
 
 # Starting brightness
 STARTING_BRIGHTNESS = 100
 
 # Dim brightness
-DIM_BRIGHTNESS = 20
+DIM_BRIGHTNESS = 10
 
 # Transition time
 TRANSITION_TIME = 1
@@ -72,7 +75,11 @@ CHANNELS_MIN_THRESHOLD = 60
 CHANNELS_MAX_THRESHOLD = 190
 
 # MIN NON ZERO COUNT
-MIN_NON_ZERO_COUNT = 100
+MIN_NON_ZERO_COUNT = 300
+
+# TOP NON ZERO COUNT THRESHOLD
+# Used only in VARIABLE_BRIGHTNESS_MODE
+MAX_NON_ZERO_COUNT = 4000
 
 # Min color spread threshold
 COLOR_SPREAD_THRESHOLD = 0.005
@@ -276,10 +283,20 @@ def main():
             nz_count = cv2.countNonZero(gray_image_output)
             if nz_count < MIN_NON_ZERO_COUNT:
                 go_dark = True
+                if VARIABLE_BRIGHTNESS_MODE:
+                    current_brightness = DIM_BRIGHTNESS
             else:
 
                 # If False go through all routines
                 go_dark = False
+                if VARIABLE_BRIGHTNESS_MODE:
+                    if nz_count > MAX_NON_ZERO_COUNT:
+                        current_brightness = STARTING_BRIGHTNESS
+                    else:
+                        current_brightness = (nz_count - MIN_NON_ZERO_COUNT) * (
+                            STARTING_BRIGHTNESS - DIM_BRIGHTNESS) / (
+                                MAX_NON_ZERO_COUNT - MIN_NON_ZERO_COUNT) + DIM_BRIGHTNESS
+                        current_brightness = int(current_brightness)
 
             # Calculate relevant color for this frame
             result_color = calculate_hue_color(masked_frame)
@@ -315,36 +332,55 @@ def main():
                     request_timeout, clear_update_flag)
                 update_timer.start()
 
-                # SWITCH ON/OFF Logic
-                switch_lights = False
-                if go_dark and lights_are_on:
-                    lights_are_on = False
-                    switch_lights = True
-                    print 'Switch off for now'
-                if not go_dark and not lights_are_on:
-                    lights_are_on = True
-                    switch_lights = True
-                    print 'Switch back on'
-                else:
+                # Old Logic
+                # TODO Refactor
+                if not VARIABLE_BRIGHTNESS_MODE or (
+                        VARIABLE_BRIGHTNESS_MODE and not DIM_LIGHTS_INSTEAD_OF_TURN_OFF):
+                    # SWITCH ON/OFF Logic
+                    switch_lights = False
+                    if go_dark and lights_are_on:
+                        lights_are_on = False
+                        switch_lights = True
+                        print 'Switch off for now'
+                    if not go_dark and not lights_are_on:
+                        lights_are_on = True
+                        switch_lights = True
+                        print 'Switch back on'
+                    else:
+                        print 'Updating with RGB: [{0}, {1}, {2}]'.format(
+                            result_color.color[0], result_color.color[1], result_color.color[2])
+                        print 'brightness: {0}'.format(current_brightness)
+
+                    for hue_light in MY_LIGHT_NAMES:
+                        if switch_lights:
+                            if not DIM_LIGHTS_INSTEAD_OF_TURN_OFF:
+                                light_names[hue_light].on = lights_are_on
+                            elif not VARIABLE_BRIGHTNESS_MODE:
+                                if lights_are_on:
+                                    light_names[hue_light].brightness = current_brightness
+                                else:
+                                    current_brightness = light_names[hue_light].brightness
+                                    light_names[hue_light].brightness = DIM_BRIGHTNESS
+
+                        # Set color if lights are on or if lights are set to be dimmed
+                        # instead of turning on/off
+                        if lights_are_on or DIM_LIGHTS_INSTEAD_OF_TURN_OFF:
+                            light_names[hue_light].xy = result_color.get_hue_color()
+
+                        # Set brightness only on variable brightness mode without dim setting
+                        if lights_are_on and \
+                                VARIABLE_BRIGHTNESS_MODE:
+                            light_names[hue_light].brightness = current_brightness
+
+                # COOLEST SETTING
+                if VARIABLE_BRIGHTNESS_MODE and DIM_LIGHTS_INSTEAD_OF_TURN_OFF:
                     print 'Updating with RGB: [{0}, {1}, {2}]'.format(
                         result_color.color[0], result_color.color[1], result_color.color[2])
+                    print 'brightness: {0}'.format(current_brightness)
 
-                for hue_light in MY_LIGHT_NAMES:
-
-                    # COMMENT OR REMOVE THIS BLOCK IF YOU DON'T WANT TO SWITCH ON/OFF YOUR LIGHTS
-                    if switch_lights:
-                        if not DIM_LIGHTS_INSTEAD_OF_TURN_OFF:
-                            light_names[hue_light].on = lights_are_on
-                        else:
-                            if lights_are_on:
-                                light_names[hue_light].brightness = current_brightness
-                            else:
-                                current_brightness = light_names[hue_light].brightness
-                                light_names[hue_light].brightness = DIM_BRIGHTNESS
-
-
-                    if lights_are_on or DIM_LIGHTS_INSTEAD_OF_TURN_OFF:
-                        light_names[hue_light].xy = result_color.get_hue_color()
+                    command = {'xy': result_color.get_hue_color(),
+                               'bri': current_brightness}
+                    BRIDGE.set_light(MY_LIGHT_NAMES, command)
 
                 print 'fps: {0}'.format(1 / (time.time()-last_time))
 
