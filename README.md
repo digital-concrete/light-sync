@@ -1,6 +1,9 @@
 # hue-ambiance: A Python script for Philips Hue
 Sync Philips Hue lights with computer screen in real time
 
+[![sample run](https://img.youtube.com/vi/GCckl4853TY/1.jpg)](https://www.youtube.com/watch?v=GCckl4853TY)
+
+
 ## Prerequisites:
 - Python environment
 - Pip: ```apt get install python-pip```
