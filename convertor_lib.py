@@ -159,8 +159,12 @@ class ColorHelper:
         Y = r * 0.283881 + g * 0.668433 + b * 0.047685
         Z = r * 0.000088 + g * 0.072310 + b * 0.986039
 
-        cx = X / (X + Y + Z)
-        cy = Y / (X + Y + Z)
+        if(X == 0 and Y == 0 and Z == 0):
+            cx = 0
+            cy = 0
+        else:
+            cx = X / (X + Y + Z)
+            cy = Y / (X + Y + Z)
 
         # Check if the given XY value is within the colourreach of our lamps.
         xy_point = XYPoint(cx, cy)

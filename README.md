@@ -9,11 +9,11 @@ Sync Philips Hue lights with computer screen in real time
 - Pip: ```apt get install python-pip```
 - OpenCV Python: ```pip install opencv-python```
 - MSS: ```pip install mss```
-- PHue: ```pip install phue```
+- Requests: ```pip install requests```
 
 ## Usage:
 
-Make sure you set the ```MY_LIGHT_NAMES``` and ```BRIDGE_IP``` variables to match your Hue System.
+Make sure you set the ```MY_LIGHT_NAMES```/```MY_LIGHT_IDS``` and ```BRIDGE_IP``` variables to match your Hue System.
 
 **Press the Hue Bridge button before running the script for the first time!**
 
@@ -23,10 +23,20 @@ Run the script in the terminal:
 python hue_ambiance.py
 ```
 
+For stereo mode start 2 instances of the script (make sure to divide by 2 the ```HUE_MAX_REQUESTS_PER_SECOND``` variable:
+
+```
+python hue_ambiance.py --screenpart left --lights Light1
+python hue_ambiance.py --screenpart right --lights Light2
+```
+
 Feel free to tweak setup variables in order to obtain preferred effect.
 
 Enjoy!
 
+## Desktop app for Linux, Mac, Windows coming soon!
+
+![hue_sync_app](example/hue_sync_app.jpg)
 
 ## How it works:
 
@@ -75,4 +85,3 @@ https://www.developers.meethue.com/
 https://github.com/studioimaginaire/phue
 
 https://github.com/benknight/hue-python-rgb-converter
-
