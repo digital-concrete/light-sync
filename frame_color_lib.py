@@ -8,6 +8,7 @@ Most relevand color algorithm
 from __future__ import print_function
 import numpy
 import cv2
+import math
 
 from convertor_lib import Converter
 
@@ -26,6 +27,9 @@ class FrameColor(object):
         self.max_threshold = max_threshold
         self.calculate_light_dark_channels()
         self.color_converter = color_converter
+        self.brightness = None
+        self.go_dark = None
+        self.diff_from_prev = None
 
     def calculate_light_dark_channels(self):
         """Calculates whether color is bright or dark"""
@@ -95,7 +99,7 @@ class FrameColorLib:
         gray_image_output = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         nz_count = cv2.countNonZero(gray_image_output)
         if nz_count < min_non_zero_count_pixels:
-            current_brightness = dim_brightness
+            current_brightness = dim_brightness - 1
         else:
             # If False go through all routines
             if nz_count > max_non_zero_count_pixels:
@@ -108,6 +112,25 @@ class FrameColorLib:
                 current_brightness = int(current_brightness)
         
         return current_brightness
+
+    def frame_colors_are_similar(self, first_color, second_color,
+                                    color_skip_sensitivity,
+                                    brightness_skip_sensitivity):
+        "checks if 2 frame colors are similar"
+        result = False
+        if first_color is not None and\
+                second_color is not None:
+                if(first_color.go_dark == True and second_color.go_dark == True):
+                    return True
+
+                if abs(first_color.brightness - second_color.brightness) < brightness_skip_sensitivity:
+                    for j in range(0, 3):
+                        ch_diff = math.fabs(
+                            int(first_color.color[j]) - int(second_color.color[j]))
+                        if ch_diff < color_skip_sensitivity:
+                            result = True
+                            break
+        return result
 
     def calculate_hue_color(self, input_img, k_means,
                             color_spread_threshold,
@@ -157,7 +180,7 @@ class FrameColorLib:
             for j in range(1, k_means):
                 if (not frame_colors[j].is_bright
                         and not frame_colors[j].is_dark
-                        and frame_colors[j].color_count / label.size
+                        and (frame_colors[j].color_count / label.size) * 100
                         > color_spread_threshold):
                     result_color = frame_colors[j]
                     break

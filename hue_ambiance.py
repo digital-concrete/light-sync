@@ -48,7 +48,7 @@ from frame_color_lib import FrameColorLib
 BRIDGE_IP = '192.168.1.22'
 
 # Part of screen to capture (useful if run in multiple instance for custom effects like stereo)
-# full, left, right, more to come
+# full, left, right, side-left side-right
 SCREEN_PART_TO_CAPTURE = "full"
 
 # Your Philips HUE lights that will be updated by this script
@@ -58,13 +58,13 @@ MY_LIGHT_NAMES = ['Light1','Light2']
 MY_LIGHT_IDS = []
 
 # Dim lights instead of turn off
-DIM_LIGHTS_INSTEAD_OF_TURN_OFF = True
+DIM_LIGHTS_INSTEAD_OF_TURN_OFF = False
 
-# Starting brightness
+# MAX brightness
 STARTING_BRIGHTNESS = 110
 
 # Dim brightness
-DIM_BRIGHTNESS = 1
+DIM_BRIGHTNESS = 3
 
 # Default color to be used when RGB are all 0
 DEFAULT_DARK_COLOR = [64, 75, 78]
@@ -74,7 +74,7 @@ BRIGHTNESS_SKIP_SENSITIVITY = 10
 
 # Transition type: 
 # 0 = instant
-# 1 = instant if frame very differend and smooth if frames similar
+# 1 = instant if frame diff is over threshold and smooth if frames are similar
 # 2 = smooth
 TRANSITION_TYPE = 0
 
@@ -87,9 +87,10 @@ HUE_MAX_REQUESTS_PER_SECOND = 10
 # Use to skip similar frames in a row
 FRAME_MATCH_SENSITIVITY = 0.008
 
-# Use to transition smoothly when frames are less than this and
-# greater tham FRAME_MATCH_SENSITIVITY 
-FRAME_MATCH_SMOOTH_TRANSITION_SENSITIVITY = 0.5
+# BETA version!!!
+# Use to transition smoothly when frames are less than this value and
+# greater than FRAME_MATCH_SENSITIVITY 
+FRAME_MATCH_SMOOTH_TRANSITION_SENSITIVITY = 0.1
 
 # Resulted colors from previous and current frame are compared channel by channel
 # If there is no difference bigger than COLOR_SKIP_SENSITIVITY between any of the channels
@@ -97,7 +98,7 @@ FRAME_MATCH_SMOOTH_TRANSITION_SENSITIVITY = 0.5
 COLOR_SKIP_SENSITIVITY = 10
 
 # If color channel values are below or above these values they are considered to be dark or bright
-# When most of the screen is dark or bright then the next available color is sent to Philips HUE
+# When most of the screen is dark or bright then the next available color is considered
 CHANNELS_MIN_THRESHOLD = 50
 CHANNELS_MAX_THRESHOLD = 190
 
@@ -108,25 +109,65 @@ MIN_NON_ZERO_COUNT = 0.2
 MAX_NON_ZERO_COUNT = 20
 
 # Min color spread threshold
-COLOR_SPREAD_THRESHOLD = 0.004
+COLOR_SPREAD_THRESHOLD = 0.4
 
 # Number of clusters computed by the OpenCV K-MEANS algorithm
-NUMBER_OF_K_MEANS_CLUSTERS = 8
+NUMBER_OF_K_MEANS_CLUSTERS = 6
 
 # Captured screen can have a very large amount of data which takes longer time to process
 # by the K Means algorithm.
 # Image will be scaled to a much smaller size resulting in real time updating of the lights
 INPUT_IMAGE_REDUCED_SIZE = 100
 
-# PHUE config
+# PHUE config file name
 PHUE_CONFIG_FILE = "phue_config"
 
+# BETA version!!!
 # Auto adjust performance
 AUTO_ADJUST_PERFORMANCE = True
 
 # Auto adjust performance after number of low fps in a row
-NUMBER_OF_LOW_FPS_IN_A_ROW = 2
+AUTO_ADJUST_PERFORMANCE_NUMBER_OF_LOW_FPS_IN_A_ROW = 2
 
+# BETA version!!!
+# Flicker prevent
+FLICKER_PREVENT = True
+
+# Number of frames in buffer
+FLICKER_PREVENT_BUFFER_SIZE = 20
+
+# Number of frames to check for color flicker
+COLOR_FLICKER_PREVENT_REQUIRED_INPUT_FRAMES_COUNT = 4
+
+# How many frames satisfy the conditions in order to detect color flicker
+COLOR_FLIKCER_DETECTION_THRESHOLD = 2
+
+# Number of frames to check for on/off flicker
+ON_OFF_FLICKER_PREVENT_REQUIRED_INPUT_FRAMES_COUNT = 8
+
+# How many frames satisfy the conditions in order to detect on/off flicker
+ON_OFF_FLIKCER_DETECTION_THRESHOLD = 2
+
+# Number of frames with correction until reset
+FLICKER_CORRECTION_FRAME_COUNT_UNTIL_RESET = 30
+
+# Flicker reset sensitivity
+# If tho consecutive frames have a greater match diff,
+# then reset the adjustments
+FLICKER_CORRECTION_RESET_SENSITIVITY = 0.3
+
+# Color Flicker sensitivity
+# Color flicker is detected if frame match is lower than this
+# and result colors are different
+COLOR_FLICKER_FRAME_MATCH_THRESHOLD = 0.2
+
+# ON OFF FLICKER CORRECTION
+ON_OFF_FLICKER_MIN_NON_ZERO_COUNT_CORRECTION_VALUE = 0.1
+
+# ON OFF FLICKER CORRECTION
+ON_OFF_FLICKER_MIN_THRESHOLD_FLICKER_CORRECTION_VALUE = 0.2
+
+# GLOBALS
 
 # CAN UPDATE HUE FLAG
 CAN_UPDATE_HUE = True
@@ -140,7 +181,6 @@ def clear_update_flag():
     # can_update_hue
     global CAN_UPDATE_HUE
     CAN_UPDATE_HUE = True
-
 
 def usage(parser):
     """Help"""
@@ -177,36 +217,69 @@ def main(argv):
     number_of_k_means_clusters = NUMBER_OF_K_MEANS_CLUSTERS
     input_image_reduced_size = INPUT_IMAGE_REDUCED_SIZE
     hue_max_requests_per_second = HUE_MAX_REQUESTS_PER_SECOND
+
+    # Auto adjust performance
     auto_adjust_performance = AUTO_ADJUST_PERFORMANCE
+    adjust_counter_limit = AUTO_ADJUST_PERFORMANCE_NUMBER_OF_LOW_FPS_IN_A_ROW
+
+    # FLICKER related
+    flicker_prevent = FLICKER_PREVENT
+    result_buffer_size = FLICKER_PREVENT_BUFFER_SIZE
+    flicker_correction_frame_count_until_reset = FLICKER_CORRECTION_FRAME_COUNT_UNTIL_RESET
+    flicker_correction_reset_sensitivity = FLICKER_CORRECTION_RESET_SENSITIVITY
+    color_flicker_frame_match_threshold = COLOR_FLICKER_FRAME_MATCH_THRESHOLD
+    color_flicker_prevent_required_input_frames_count = COLOR_FLICKER_PREVENT_REQUIRED_INPUT_FRAMES_COUNT
+    on_off_flicker_prevent_required_input_frames_count = ON_OFF_FLICKER_PREVENT_REQUIRED_INPUT_FRAMES_COUNT
+    color_flicker_count_threshold = COLOR_FLIKCER_DETECTION_THRESHOLD
+    on_off_flicker_count_threshold = ON_OFF_FLIKCER_DETECTION_THRESHOLD
+    min_non_zero_count_on_off_flicker_correction_value = ON_OFF_FLICKER_MIN_NON_ZERO_COUNT_CORRECTION_VALUE
+    channels_min_threshold_on_off_flicker_correction_value = ON_OFF_FLICKER_MIN_THRESHOLD_FLICKER_CORRECTION_VALUE
 
     # Arguments or defaults
     parser = argparse.ArgumentParser(description="Sync Hue Lights with computer display")
     parser.add_argument("-i", "--bridgeip", help="Your Philips Hue Bridge IP")
     parser.add_argument("-u", "--user", help="Your Philips Hue Bridge User")
-    parser.add_argument("-p", "--screenpart", help="Part of the screen to capture: full, left, right (default full)")
+    parser.add_argument("-p", "--screenpart", help="Part of the screen to capture: full, left, right, \
+                                                side-left, side-right (default full)")
     parser.add_argument("-l", "--lightids", help="Your Philips HUE light Ids that will be updated, comma separated")
     parser.add_argument("-L", "--lights", help="Your Philips HUE light Names that will be updated, comma separated")
-    parser.add_argument("-b", "--dimbrightness", help="Dim/MIN brightness (0-256) must be less than maxbrightness")
-    parser.add_argument("-B", "--maxbrightness", help="Starting/MAX brightness (0-256)")
+    parser.add_argument("-b", "--dimbrightness", help="Dim/MIN brightness [0-256] must be less than maxbrightness")
+    parser.add_argument("-B", "--maxbrightness", help="MAX brightness [0-256]")
     parser.add_argument("-D", "--dimlightsinsteadofturnoff", help="Dim lights or Turn OFF on dark screens (default true - DIM)")
     parser.add_argument("-t", "--transitiontime", help="Transition time, default 1")
     parser.add_argument("-y", "--transitiontype", help="Transition type, default 1 (0 = instant, 1 = comfortable, 2 = smooth)")
-    parser.add_argument("-v", "--frametransitionsensitivity", help="Smooth transition sensitivity for comfortable mode, default 0.5.\
+    parser.add_argument("-v", "--frametransitionsensitivity", help="Smooth transition sensitivity for comfortable mode, [0-1] default 0.5.\
                                                              Frame difference between framematchsensitivity and frametransitionsensitivity\
                                                              will have a transition time. Otherwise transition will be instant")
-    parser.add_argument("-s", "--framematchsensitivity", help="Use to skip similar frames in a row (default: 0.008)")
-    parser.add_argument("-S", "--colorskipsensitivity", help="Skip frame if color is similar (0-256, default 10)")
-    parser.add_argument("-g", "--brightnessskipsensitivity", help="Skip frame if brightness diff is less (0-256, default 10)")
-    parser.add_argument("-c", "--channelsminthreshold", help="Dark threshold (0-256, default 50)")
-    parser.add_argument("-C", "--channelsmaxthreshold", help="Bright threshold (0-256, default 190, > minthreshold)")
-    parser.add_argument("-m", "--minnzcount", help="Min non zero threshold (0-100, default 0.2)")
-    parser.add_argument("-M", "--maxnzcount", help="Top non zero threshold (1-100, default 20, > minthreshold)")
-    parser.add_argument("-d", "--colorspreadthreshold", help="Color spread threshold (0-100, default 0.005)")
+    parser.add_argument("-s", "--framematchsensitivity", help="Use to skip similar frames in a row [0-1] default: 0.008")
+    parser.add_argument("-S", "--colorskipsensitivity", help="Skip frame if color is similar [0-256], default 10")
+    parser.add_argument("-g", "--brightnessskipsensitivity", help="Skip frame if brightness diff is less [0-256], default 10")
+    parser.add_argument("-c", "--channelsminthreshold", help="Dark threshold [0-256], default 50")
+    parser.add_argument("-C", "--channelsmaxthreshold", help="Bright threshold [0-25]6, default 190, > minthreshold")
+    parser.add_argument("-m", "--minnzcount", help="Min non zero threshold [0-100], default 0.2")
+    parser.add_argument("-M", "--maxnzcount", help="Top non zero threshold [1-100], default 20, > minthreshold")
+    parser.add_argument("-d", "--colorspreadthreshold", help="Color spread threshold [0-100], default 0.005")
     parser.add_argument("-k", "--kmeansclusters", help="Number of clusters computed by the OpenCV K-MEANS algorithm")
     parser.add_argument("-z", "--shrinkframesize", help="Frame capture shrinked size in pixel for better performance (default 100)")
     parser.add_argument("-T", "--maxrequestspersecond", help="Max requests per second sent to bridge api (default 10)")
-    parser.add_argument("-A", "--autoadjustperformance", help="Auto adjust script performance")
     parser.add_argument("-a", "--autodiscovery", help="Bridge auto discovery on LAN")
+    
+    # Auto adjust performance
+    parser.add_argument("-A", "--autoadjustperformance", help="Auto adjust script performance (default True)")
+    parser.add_argument("-Af", "--autoadjustperformancelowfpscount", help="Number of low fps in a row to trigger performance adjust (default 2)")
+
+    # FLICKER args
+    parser.add_argument("-f", "--flickercorrection", help="Enable flicker correction (default True)")
+    parser.add_argument("-fb", "--flickerframebuffersize", help="Flicker prevent result buffer size (default 20)")
+    parser.add_argument("-fr", "--flickerresetcounter", help="Flicker correction frame count until reset (default 30)")
+    parser.add_argument("-fs", "--flickerresetsensitivity", help="Flicker correction reset sensitivity (default 0.3)")
+    parser.add_argument("-fcs", "--colorflickersensitivity", help="Color flicker frame match threshold (default 0.2)")
+    parser.add_argument("-fci", "--colorflickerinput", help="Color flicker detection required input frames count (default 4)")
+    parser.add_argument("-foi", "--onoffflickerinput", help="On/Off flicker detection required input frames count (default 8)")
+    parser.add_argument("-fcc", "--colorflickercount", help="Number of frames that match color flicker condition required to trigger correction (default 2)")
+    parser.add_argument("-foc", "--onoffflickercount", help="Number of frames that match on/off flicker condition required to trigger correction (default 2)")
+    parser.add_argument("-fonz", "--onoffflickerminnzcorrection", help="On/Off flicker min nz count correction (default 0.1)")
+    parser.add_argument("-focm", "--onoffflickerchannelsmincorrection", help="On/Off flicker channels min threshold correction (default 0.2)")
 
     args = parser.parse_args()
 
@@ -364,6 +437,8 @@ def main(argv):
         except ValueError:
             print ("maxrequestspersecond must be a number\n")
             usage(parser)
+    
+    # Auto adjust performance args
     if args.autoadjustperformance:
         try:
             aa = str(args.autoadjustperformance).upper()
@@ -376,6 +451,119 @@ def main(argv):
             print ("Set auto adjust performance: " + str(auto_adjust_performance))
         except ValueError:
             print ("autoadjustperformance must be a boolean\n")
+            usage(parser)
+    if args.autoadjustperformancelowfpscount:
+        try:
+            adjust_counter_limit = int(args.autoadjustperformancelowfpscount)
+            print ("Set auto adjust performance low fps count: " +
+                    str(adjust_counter_limit))
+        except ValueError:
+            print ("autoadjustperformancelowfpscount must be a number\n")
+            usage(parser)
+
+    # FLICKER args
+    if args.flickercorrection:
+        try:
+            aa = str(args.flickercorrection).upper()
+            if 'TRUE'.startswith(aa):
+                flicker_prevent = True
+            elif 'FALSE'.startswith(aa):
+                flicker_prevent = False
+            else:
+                raise ValueError("flickercorrection must be a boolean\n")
+            print ("Set flicker prevent: " + str(flicker_prevent))
+        except ValueError:
+            print ("flickercorrection must be a boolean\n")
+            usage(parser)
+
+    if args.flickerframebuffersize:
+        try:
+            result_buffer_size = int(args.flickerframebuffersize)
+            print ("Set flicker prevent result buffer size : " +
+                    str(result_buffer_size))
+        except ValueError:
+            print ("flickerframebuffersize must be a number\n")
+            usage(parser)
+    
+    if args.flickerresetcounter:
+        try:
+            flicker_correction_frame_count_until_reset = int(args.flickerresetcounter)
+            print ("Set flicker correction frame count until reset : " +
+                    str(flicker_correction_frame_count_until_reset))
+        except ValueError:
+            print ("flickerresetcounter must be a number\n")
+            usage(parser)
+    
+    if args.flickerresetsensitivity:
+        try:
+            flicker_correction_reset_sensitivity = float(args.flickerresetsensitivity)
+            print ("Set flicker correction reset sensitivity : " +
+                    str(flicker_correction_reset_sensitivity))
+        except ValueError:
+            print ("flickerresetsensitivity must be a number\n")
+            usage(parser)
+    
+    if args.colorflickersensitivity:
+        try:
+            color_flicker_frame_match_threshold = float(args.colorflickersensitivity)
+            print ("Set color flicker frame match threshold : " +
+                    str(color_flicker_frame_match_threshold))
+        except ValueError:
+            print ("colorflickersensitivity must be a number\n")
+            usage(parser)
+
+    if args.colorflickerinput:
+        try:
+            color_flicker_prevent_required_input_frames_count = int(args.colorflickerinput)
+            print ("Set color flicker detection required input frames count : " +
+                    str(color_flicker_prevent_required_input_frames_count))
+        except ValueError:
+            print ("colorflickerinput must be a number\n")
+            usage(parser)
+
+    if args.onoffflickerinput:
+        try:
+            on_off_flicker_prevent_required_input_frames_count = int(args.onoffflickerinput)
+            print ("Set On/Off flicker detection required input frames count : " +
+                    str(on_off_flicker_prevent_required_input_frames_count))
+        except ValueError:
+            print ("onoffflickerinput must be a number\n")
+            usage(parser)
+
+    if args.colorflickercount:
+        try:
+            color_flicker_count_threshold = int(args.colorflickercount)
+            print ("Set number of frames that match color flicker condition required to trigger correction : " +
+                    str(color_flicker_count_threshold))
+        except ValueError:
+            print ("colorflickercount must be a number\n")
+            usage(parser)
+    
+    if args.onoffflickercount:
+        try:
+            on_off_flicker_count_threshold = int(args.onoffflickercount)
+            print ("Set number of frames that match on/off flicker condition required to trigger correction : " +
+                    str(on_off_flicker_count_threshold))
+        except ValueError:
+            print ("onoffflickercount must be a number\n")
+            usage(parser)
+    
+    if args.onoffflickerminnzcorrection:
+        try:
+            min_non_zero_count_on_off_flicker_correction_value = float(args.onoffflickerminnzcorrection)
+            print ("Set On/Off flicker min nz count correction : " +
+                    str(min_non_zero_count_on_off_flicker_correction_value))
+        except ValueError:
+            print ("onoffflickerminnzcorrection must be a number\n")
+            usage(parser)
+
+    if args.onoffflickerchannelsmincorrection:
+        try:
+            channels_min_threshold_on_off_flicker_correction_value = float(args.onoffflickerchannelsmincorrection)
+            print ("Set On/Off flicker channels min threshold correction : " +
+                    str(channels_min_threshold_on_off_flicker_correction_value))
+        except ValueError:
+            print ("onoffflickerchannelsmincorrection must be a number\n")
             usage(parser)
 
 
@@ -414,6 +602,9 @@ def main(argv):
         print ('Please select at least one light.')
         usage(parser)
 
+    if not dim_lights_instead_of_turn_off:
+        dim_brightness = 3
+
     # Variables
     go_dark = False
     current_brightness = starting_brightness
@@ -424,11 +615,21 @@ def main(argv):
     prev_frame = None
     prev_brightness = None
     prev_fps = None
+
+    # Auto adjust performance vars
     adjust_position = 0
     adjust_counter = 0
-    adjust_counter_limit = NUMBER_OF_LOW_FPS_IN_A_ROW
     request_timeout = 1/hue_max_requests_per_second * number_of_lights
 
+    # FLICKER prevent vars
+    result_buffer = []
+    color_flicker_countdown = 0
+    on_off_flicker_countdown = 0
+
+    # FLICKER correction defaults
+    min_non_zero_count_flicker_correction = 1
+    channels_min_threshold_flicker_correction = 1
+    k_means_flicker_correction = 0
 
     global CAN_UPDATE_HUE
 
@@ -489,11 +690,20 @@ def main(argv):
         if screen_part_to_capture == "full":
             monitor = full_mon
         elif screen_part_to_capture == "left":
-            full_mon_width = int(full_mon["width"]/2)
-            monitor = {'top': 0, 'left': 0, 'width': full_mon_width, 'height': full_mon["height"]}
+            half_mon_width = int(full_mon["width"]/2)
+            monitor = {'top': 0, 'left': 0, 'width': half_mon_width, 'height': full_mon["height"]}
         elif screen_part_to_capture == "right":
-            full_mon_width = int(full_mon["width"]/2)
-            monitor = {'top': 0, 'left': full_mon_width, 'width': full_mon_width, 'height': full_mon["height"]}
+            half_mon_width = int(full_mon["width"]/2)
+            monitor = {'top': 0, 'left': half_mon_width, 'width': half_mon_width, 'height': full_mon["height"]}
+        elif screen_part_to_capture == "side-left":
+            side_mon_width = int(full_mon["width"]/4)
+            monitor = {'top': 0, 'left': 0, 'width': side_mon_width, 'height': full_mon["height"]}
+        elif screen_part_to_capture == "side-right":
+            side_mon_width = int(full_mon["width"]/4)
+            side_mon_right_offset = full_mon["width"] - side_mon_width
+            monitor = {'top': 0, 'left': side_mon_right_offset, 'width': side_mon_width, 'height': full_mon["height"]}
+
+
 
         while 'Screen capturing':
                         
@@ -504,16 +714,19 @@ def main(argv):
 
             # Shrink image for performance sake
             current_frame = FRAME_COLOR_LIB.shrink_image(img, input_image_reduced_size)
+            
+            # init frame comparrison result
+            comparison_result = None
 
             # Compare Frame with Prev Frame
             # Skip if similar
             if prev_frame is not None:
+                
                 comparison_result = cv2.matchTemplate(
                     current_frame, prev_frame, 1)
-                # print('comparison result: {0}'.format(comparison_result[0][0]))
                 if comparison_result[0][0] < frame_match_sensitivity:
                     continue
-                
+
                 #transition stuff
                 elif transition_type == 1:
                     if comparison_result[0][0] < frame_transition_sensitivity:
@@ -522,10 +735,11 @@ def main(argv):
                         current_transition_time = 0
             
             # Apply dark color threshold and compute mask
-            masked_frame = FRAME_COLOR_LIB.apply_frame_mask(current_frame, channels_min_threshold)
+            masked_frame = FRAME_COLOR_LIB.apply_frame_mask(current_frame, channels_min_threshold * channels_min_threshold_flicker_correction)
 
             current_brightness = FRAME_COLOR_LIB.calculate_frame_brightness(masked_frame, 
-                dim_brightness, starting_brightness, min_non_zero_count, max_non_zero_count)
+                dim_brightness, starting_brightness, min_non_zero_count * min_non_zero_count_flicker_correction,
+                max_non_zero_count)
             
             # Turn on/off depending on result brightness
             if not dim_lights_instead_of_turn_off:
@@ -536,8 +750,14 @@ def main(argv):
 
             # Calculate relevant color for this frame
             result_color = FRAME_COLOR_LIB.calculate_hue_color(
-                masked_frame, number_of_k_means_clusters, color_spread_threshold,
-                channels_min_threshold, channels_max_threshold)
+                masked_frame, (number_of_k_means_clusters-k_means_flicker_correction), color_spread_threshold,
+                channels_min_threshold * channels_min_threshold_flicker_correction, channels_max_threshold)
+            
+            # save brightness, go_dark and diff from prev frame for later use
+            result_color.brightness = current_brightness
+            result_color.go_dark = go_dark
+            if(comparison_result is not None):
+                result_color.diff_from_prev = comparison_result[0][0]
 
             # Compare Current Calculated Color with previous Color
             # Skip frame if result color is almost identical
@@ -552,6 +772,81 @@ def main(argv):
                         break
                 if skip_frame:
                     continue
+            
+            # Anti Flicker algorithm 
+            # BETA VERSION
+            if(flicker_prevent):
+                result_buffer.append(result_color)
+                current_buffer_size = len(result_buffer)
+
+                # reset flicker temporary adjustments if any
+                if(result_color.diff_from_prev is not None and \
+                    result_color.diff_from_prev > flicker_correction_reset_sensitivity):
+                    if(k_means_flicker_correction != 0):
+                        color_flicker_countdown = 0
+                        k_means_flicker_correction = 0
+                        print('reset color FLICKER adjustments')
+                    if(min_non_zero_count_flicker_correction != 1):
+                        on_off_flicker_countdown = 0
+                        min_non_zero_count_flicker_correction = 1
+                        channels_min_threshold_flicker_correction = 1
+                        print('reset on/off FLICKER adjustments')
+                else:                    
+                    color_flicker_count = 0
+                    current_buffer_size = len(result_buffer)
+                    if current_buffer_size >= color_flicker_prevent_required_input_frames_count:
+                        for j in range (current_buffer_size - (color_flicker_prevent_required_input_frames_count), \
+                                        current_buffer_size-1):
+                            color_check =  FRAME_COLOR_LIB.frame_colors_are_similar(\
+                                            result_buffer[j], result_buffer[j-1],
+                                            color_skip_sensitivity, brightness_skip_sensitivity)
+                            if result_buffer[j].diff_from_prev is not None and\
+                                result_buffer[j].diff_from_prev < color_flicker_frame_match_threshold and\
+                                not color_check:
+                                color_flicker_count += 1
+
+                        if color_flicker_count >= color_flicker_count_threshold:
+                            # Lower the k means if color flicker detected
+                            k_means_flicker_correction = int(number_of_k_means_clusters/2) - 1
+                            print('COLOR FLICKER AVOIDED | new K: {0}'.format(number_of_k_means_clusters - k_means_flicker_correction))
+                            color_flicker_countdown = flicker_correction_frame_count_until_reset                    
+
+                    # ON OFF FLICKER
+                    if not dim_lights_instead_of_turn_off and go_dark:
+                        on_off_count = 0
+                        current_buffer_size = len(result_buffer)
+                        if current_buffer_size >= on_off_flicker_prevent_required_input_frames_count:
+                            for j in range (current_buffer_size - (on_off_flicker_prevent_required_input_frames_count + 1), \
+                                            current_buffer_size-1):
+                                if not result_buffer[j].go_dark and result_buffer[j+1].go_dark:
+                                    on_off_count += 1
+
+                            if on_off_count >= on_off_flicker_count_threshold:
+                                # Lower the turn off threshold if lights are switched off many times in a short period of time
+                                min_non_zero_count_flicker_correction = min_non_zero_count_on_off_flicker_correction_value
+                                channels_min_threshold_flicker_correction = channels_min_threshold_on_off_flicker_correction_value
+                                print('ON/OFF FLICKER AVOIDED | new min nz: {0}'.format(min_non_zero_count * min_non_zero_count_flicker_correction))
+                                on_off_flicker_countdown = flicker_correction_frame_count_until_reset
+
+                    # Keep buffer at specified size
+                    if len(result_buffer) == result_buffer_size:
+                        result_buffer.pop(0)
+
+                    if color_flicker_countdown >= 1:
+                        color_flicker_countdown -= 1
+                        if color_flicker_countdown == 0:
+                            k_means_flicker_correction = 0
+                            print('back from color FLICKER')
+
+                    if on_off_flicker_countdown >= 1:
+                        on_off_flicker_countdown -= 1
+                        if on_off_flicker_countdown == 0:
+                            min_non_zero_count_flicker_correction = 1
+                            channels_min_threshold_flicker_correction = 1
+                            print('back from on off FLICKER')
+
+                
+                    # print('RESULT_BUFFER count: {0}'.format(len(RESULT_BUFFER)))
 
             # Send color to Hue if update flag is clear
             if CAN_UPDATE_HUE:
@@ -605,9 +900,9 @@ def main(argv):
                 prev_fps = 1 / (time.time()-last_time)
                 print ('fps: {0}'.format(prev_fps))
 
-                # If bad FPS!
+                # BETA VERSION !!!
+                # If bad FPS
                 # Adjust params to achieve smooth performance 
-                # BETA VERSION
                 if(auto_adjust_performance 
                     and prev_fps 
                     and prev_fps < hue_max_requests_per_second):
@@ -620,7 +915,7 @@ def main(argv):
                             # increment if there is nothing to do here
                             adjust_position = 3
 
-                        if adjust_position % 6 == 3 and number_of_k_means_clusters >= 4:
+                        if adjust_position % 6 == 3 and number_of_k_means_clusters > 4:
                             print("adjust k means")
                             number_of_k_means_clusters -= 1
                         elif adjust_position % 6 == 3:
