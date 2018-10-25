@@ -34,9 +34,11 @@ Feel free to tweak setup variables in order to obtain preferred effect.
 
 Enjoy!
 
-## Desktop app for Linux, Mac, Windows coming soon!
+## Desktop app for Linux, Mac, Windows available:
 
 ![hue_sync_app](example/hue_sync_app.jpg)
+
+https://github.com/digital-concrete/hue-ambiance-electron
 
 ## How it works:
 
