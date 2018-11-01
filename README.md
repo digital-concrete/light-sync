@@ -1,4 +1,4 @@
-# hue-ambiance: A Python script for Philips Hue
+# light-sync: A Python script for Philips Hue
 Sync Philips Hue lights with computer screen in real time
 
 [![sample run](https://img.youtube.com/vi/GCckl4853TY/1.jpg)](https://www.youtube.com/watch?v=GCckl4853TY)
@@ -20,14 +20,14 @@ Make sure you set the ```MY_LIGHT_NAMES```/```MY_LIGHT_IDS``` and ```BRIDGE_IP``
 Run the script in the terminal: 
 
 ```
-python hue_ambiance.py
+python light_sync.py
 ```
 
 For stereo mode start 2 instances of the script (make sure to divide by 2 the ```HUE_MAX_REQUESTS_PER_SECOND``` variable:
 
 ```
-python hue_ambiance.py --screenpart left --lights Light1
-python hue_ambiance.py --screenpart right --lights Light2
+python light_sync.py --screenpart left --lights Light1
+python light_sync.py --screenpart right --lights Light2
 ```
 
 Feel free to tweak setup variables in order to obtain preferred effect.
@@ -36,9 +36,9 @@ Enjoy!
 
 ## Desktop app for Linux, Mac, Windows available:
 
-![hue_sync_app](example/hue_sync_app.jpg)
+![light_sync_app](example/light_sync_app.jpg)
 
-https://github.com/digital-concrete/hue-ambiance-electron
+https://github.com/digital-concrete/light-sync-electron
 
 ## How it works:
 
