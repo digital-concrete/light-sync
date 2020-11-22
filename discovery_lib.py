@@ -12,7 +12,7 @@ import requests
 
 
 # NUPNP adress
-HUE_NUPNP = "https://www.meethue.com/api/nupnp"
+HUE_NUPNP = "https://discovery.meethue.com"
 
 class IPError(Exception):
     ''' Raise when the Hue Bridge IP address cannot be resolved '''
@@ -78,4 +78,3 @@ class DiscoveryLib:
     # CUSTOM EXCEPTIONS #
     #####################
 
-   
